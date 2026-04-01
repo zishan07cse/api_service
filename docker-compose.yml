@@ -1,0 +1,18 @@
+services:
+  php:
+    build:
+      context: .
+    image: api_service_php  
+    volumes:
+      - .:/var/www/html
+    environment:
+      APP_ENV: production
+      APP_NAME: api_service
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
