@@ -2,7 +2,7 @@ name: PHP API CI/CD Pipeline
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
@@ -10,65 +10,69 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    #  1. Checkout repository
-    - name: Checkout code
-      uses: actions/checkout@v3
+      #  1. Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    #  2. Validate PHP
-    - name: Validate PHP files
-      run: |
-        find . -name "*.php" -exec php -l {} \;
+      #  2. Validate PHP
+      - name: Validate PHP files
+        run: |
+          find . -name "*.php" -exec php -l {} \;
 
-    #  3. Build Docker image
-    - name: Build Docker image
-      run: docker build -t api_service_php .
+      #  3. Build Docker image
+      - name: Build Docker image
+        run: docker build -t api_service_php .
 
-    #  4. Run container for testing
-    - name: Run test container
-      run: |
-        docker run -d -p 8000:8000 api_service_php \
-        php -S 0.0.0.0:8000 index.php
+      #  4. Run container for testing
+      - name: Run test container
+        run: |
+          docker run -d -p 8000:8000 api_service_php \
+          php -S 0.0.0.0:8000 index.php
 
-    #  5. Wait for app
-    - name: Wait for app startup
-      run: sleep 5
+      #  5. Wait for app
+      - name: Wait for app startup
+        run: sleep 5
 
-    # 6. Test GET
-    - name: Test GET /status
-      run: curl -f http://localhost:8000/status
+      # 6. Test GET
+      - name: Test GET /status
+        run: curl -f http://localhost:8000/status
 
-    # 7. Test POST
-    - name: Test POST /data
-      run: |
-        curl -X POST http://localhost:8000/data \
-        -H "Content-Type: application/json" \
-        -d '{"name":"ci-test"}'
+      # 7. Test POST
+      - name: Test POST /data
+        run: |
+          curl -X POST http://localhost:8000/data \
+          -H "Content-Type: application/json" \
+          -d '{"name":"ci-test"}'
 
-    # 8. Stop container
-    - name: Stop test container
-      run: docker ps -q | xargs docker stop
+      # 8. Stop container
+      - name: Stop test container
+        run: docker ps -q | xargs docker stop
 
-    # 9. DEPLOY TO EC2 (REAL)
-    - name: Deploy to AWS EC2
-      uses: appleboy/ssh-action@v0.1.10
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USER }}
-        key: ${{ secrets.EC2_SSH_KEY }}
-        script: |
-          # Go to app folder or clone if not exists
-          if [ ! -d "api_service" ]; then
-            git clone https://github.com/zishan07cse/api_service.git
-          fi
+      # 9. DEPLOY TO EC2 (REAL)
+      - name: Deploy to AWS EC2
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Go to app folder or clone if not exists
+            if [ ! -d "api_service" ]; then
+              git clone https://github.com/zishan07cse/api_service.git
+            fi
 
-          cd api_service
+            cd api_service
 
-          # Pull latest code
-          git pull origin main
+            # Pull latest code
+            git pull origin main
 
-          docker-compose down
-          docker-compose up -d --build --scale php=2   
-           # Deploy containers
-          sudo docker compose down
-          sudo docker compose up -d --build --scale php=2
-  
+            docker-compose down
+            docker-compose up -d --build --scale php=2   
+             # Deploy containers
+            sudo docker compose down
+            sudo docker compose up -d --build --scale php=2
+    #  - name: Deploy to Kubernetes
+    #    run: |
+    #      kubectl apply -f k8s/
+    #      kubectl rollout restart deployment php
+    #      kubectl scale deployment php --replicas=3
