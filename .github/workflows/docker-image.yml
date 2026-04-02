@@ -1,0 +1,56 @@
+name: PHP API CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:   # 👈 manual trigger support
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 🔹 1. Checkout repository
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # 🔹 2. Build application (PHP syntax validation)
+    - name: Validate PHP files
+      run: |
+        find . -name "*.php" -exec php -l {} \;
+
+    # 🔹 3. Build Docker image
+    - name: Build Docker image
+      run: docker build -t api_service_php .
+
+    # 🔹 4. Run container for testing (lightweight server)
+    - name: Run test container
+      run: |
+        docker run -d -p 8000:8000 api_service_php \
+        php -S 0.0.0.0:8000 index.php
+
+    # 🔹 5. Wait for service to be ready
+    - name: Wait for app startup
+      run: sleep 5
+
+    # 🔹 6. Test GET endpoint
+    - name: Test GET /status
+      run: |
+        curl -f http://localhost:8000/status
+
+    # 🔹 7. Test POST endpoint
+    - name: Test POST /data
+      run: |
+        curl -X POST http://localhost:8000/data \
+        -H "Content-Type: application/json" \
+        -d '{"name":"ci-test"}'
+
+    # 🔹 8. Stop test container
+    - name: Stop test container
+      run: docker ps -q | xargs docker stop
+
+    # 🔹 9. Deploy application (simulate production)
+    - name: Deploy with Docker Compose
+      run: |
+        docker compose down
+        docker compose up -d --build --scale php=2
