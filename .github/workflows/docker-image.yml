@@ -3,7 +3,7 @@ name: PHP API CI/CD Pipeline
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch:   # 👈 manual trigger support
+  workflow_dispatch:
 
 jobs:
   build-test-deploy:
@@ -14,7 +14,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # 🔹 2. Build application (PHP syntax validation)
+    # 🔹 2. Validate PHP
     - name: Validate PHP files
       run: |
         find . -name "*.php" -exec php -l {} \;
@@ -23,34 +23,49 @@ jobs:
     - name: Build Docker image
       run: docker build -t api_service_php .
 
-    # 🔹 4. Run container for testing (lightweight server)
+    # 🔹 4. Run container for testing
     - name: Run test container
       run: |
         docker run -d -p 8000:8000 api_service_php \
         php -S 0.0.0.0:8000 index.php
 
-    # 🔹 5. Wait for service to be ready
+    # 🔹 5. Wait for app
     - name: Wait for app startup
       run: sleep 5
 
-    # 🔹 6. Test GET endpoint
+    # 🔹 6. Test GET
     - name: Test GET /status
-      run: |
-        curl -f http://localhost:8000/status
+      run: curl -f http://localhost:8000/status
 
-    # 🔹 7. Test POST endpoint
+    # 🔹 7. Test POST
     - name: Test POST /data
       run: |
         curl -X POST http://localhost:8000/data \
         -H "Content-Type: application/json" \
         -d '{"name":"ci-test"}'
 
-    # 🔹 8. Stop test container
+    # 🔹 8. Stop container
     - name: Stop test container
       run: docker ps -q | xargs docker stop
 
-    # 🔹 9. Deploy application (simulate production)
-    - name: Deploy with Docker Compose
-      run: |
-        docker compose down
-        docker compose up -d --build --scale php=2
+    # 🔥 9. DEPLOY TO EC2 (REAL)
+    - name: Deploy to AWS EC2
+      uses: appleboy/ssh-action@v0.1.10
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          # Go to app folder or clone if not exists
+          if [ ! -d "api_service" ]; then
+            git clone https://github.com/zishan07cse/api_service.git
+          fi
+
+          cd api_service
+
+          # Pull latest code
+          git pull origin main
+
+          # Deploy containers
+          docker compose down
+          docker compose up -d --build --scale php=2
